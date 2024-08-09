@@ -59,3 +59,48 @@ export const getMessage = async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 };
+
+export const deleteMessage = async (req, res) => {
+  try {
+    const { id: messageId } = req.params;
+    const userId = req.user._id;
+
+    const message = await MessageModel.findById(messageId);
+    if (!message) {
+      return res.status(404).json({ message: "Message not found" });
+    }
+
+    // بررسی اینکه کاربر مالک پیام است یا گیرنده پیام
+    if (
+      message.senderId.toString() !== userId.toString() &&
+      message.receiverId.toString() !== userId.toString()
+    ) {
+      return res.status(403).json({
+        message: "You can only delete your own messages",
+      });
+    }
+
+    // حذف پیام از دیتابیس
+    const deletedMessage = await MessageModel.findByIdAndDelete(messageId);
+    if (!deletedMessage) {
+      return res.status(500).json({ message: "Failed to delete the message" });
+    }
+
+    // حذف پیام از مکالمه مرتبط
+    await ConversationModel.findOneAndUpdate(
+      { participants: { $all: [message.senderId, message.receiverId] } },
+      { $pull: { messages: messageId } }
+    );
+
+    // ارسال اطلاع‌رسانی به گیرنده پیام
+    const receiverSocketId = getReciverSocketId(message.receiverId);
+    if (receiverSocketId) {
+      io.to(receiverSocketId).emit("messageDeleted", messageId);
+    }
+
+    res.status(200).json({ message: "Message deleted successfully" });
+  } catch (error) {
+    console.error("Error deleting message:", error);
+    res.status(500).json({ message: "An error occurred while deleting the message" });
+  }
+};

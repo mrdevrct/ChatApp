@@ -9,7 +9,7 @@ const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
     origin: ["http://localhost:3000"],
-    methods: ["GET", "POST"],
+    methods: ["GET", "POST", "DELETE"],
   },
 });
 
@@ -26,14 +26,13 @@ io.on("connection", (socket) => {
   //get Online users
   io.emit("getOnlineUsers", Object.keys(userSocketMap));
 
-
   //typing
   socket.on("typing", async ({ receiverId, isTyping }) => {
     const receiverSocketId = getReciverSocketId(receiverId);
     if (receiverSocketId) {
-      const snder = await UserModel.findOne({ _id : userId},"fullname")
+      const snder = await UserModel.findOne({ _id: userId }, "fullname");
       io.to(receiverSocketId).emit("typing", {
-        snderName:snder.fullname,
+        snderName: snder.fullname,
         isTyping,
         receiverId,
       });
